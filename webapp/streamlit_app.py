@@ -69,7 +69,7 @@ def create_gradcam_display(gradcam_data):
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.image(gradcam_data['original_image'], caption="Original X-ray", use_column_width=True)
+        st.image(gradcam_data['original_image'], caption="Original X-ray", use_container_width=True)
     
     with col2:
         # Create heatmap figure
@@ -82,7 +82,7 @@ def create_gradcam_display(gradcam_data):
         plt.close(fig)
     
     with col3:
-        st.image(gradcam_data['overlay'], caption="Heatmap Overlay", use_column_width=True)
+        st.image(gradcam_data['overlay'], caption="Heatmap Overlay", use_container_width=True)
 
 def create_model_info_sidebar():
     """Create model information sidebar"""
@@ -192,7 +192,7 @@ def main():
         if uploaded_file is not None:
             # Display uploaded image
             image = Image.open(uploaded_file)
-            st.image(image, caption="Uploaded X-ray", use_column_width=True)
+            st.image(image, caption="Uploaded X-ray", use_container_width=True)
             
             # Image info
             st.info(f"Image size: {image.size[0]} x {image.size[1]} pixels")
@@ -204,16 +204,47 @@ def main():
             # Process button
             if st.button("🔬 Analyze Image", type="primary"):
                 with st.spinner("Analyzing image..."):
-                    # Make prediction
-                    result = predictor.predict(uploaded_file, return_gradcam=True)
-                    
-                    # Display results
-                    create_prediction_display(result)
-                    
-                    # Show Grad-CAM if requested and available
-                    if st.session_state.get('show_gradcam', True) and result.get("gradcam"):
-                        st.markdown("---")
-                        create_gradcam_display(result["gradcam"])
+                    try:
+                        # Convert uploaded file to PIL Image
+                        pil_image = Image.open(uploaded_file)
+                        st.info(f"PIL Image loaded successfully. Mode: {pil_image.mode}, Size: {pil_image.size}")
+                        
+                        # Test basic preprocessing first
+                        st.info("Testing image preprocessing...")
+                        
+                        # Try simple prediction first
+                        try:
+                            from simple_predict import simple_predict
+                            simple_result = simple_predict(pil_image)
+                            if "error" not in simple_result:
+                                st.success("Simple prediction successful!")
+                                st.info(f"Prediction: {simple_result['prediction']}")
+                                st.info(f"Confidence: {simple_result['confidence']:.2%}")
+                            else:
+                                st.warning(f"Simple prediction failed: {simple_result['error']}")
+                        except Exception as simple_e:
+                            st.warning(f"Simple prediction error: {simple_e}")
+                        
+                        # Make full prediction
+                        result = predictor.predict(pil_image, return_gradcam=True)
+                        
+                        # Display results
+                        create_prediction_display(result)
+                        
+                        # Show Grad-CAM if requested and available
+                        if st.session_state.get('show_gradcam', True) and result.get("gradcam"):
+                            st.markdown("---")
+                            create_gradcam_display(result["gradcam"])
+                            
+                    except Exception as e:
+                        st.error(f"Error processing image: {str(e)}")
+                        st.info("Please try uploading a different image file (JPG, JPEG, PNG)")
+                        
+                        # Show detailed error for debugging
+                        with st.expander("Debug Information"):
+                            st.code(str(e))
+                            import traceback
+                            st.code(traceback.format_exc())
     
     # Footer
     st.markdown("---")
