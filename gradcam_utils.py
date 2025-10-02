@@ -5,9 +5,13 @@ Grad-CAM utilities for pneumonia detection model visualization
 import numpy as np
 import tensorflow as tf
 from tensorflow import keras
-import cv2
+import matplotlib
+matplotlib.use('Agg')  # Use non-interactive backend for Streamlit Cloud
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
+
+# OpenCV disabled for Streamlit Cloud compatibility
+CV2_AVAILABLE = False
 
 def make_gradcam_heatmap(img_array, model, last_conv_layer_name, pred_index=None):
     """
@@ -76,28 +80,32 @@ def overlay_heatmap_on_image(img, heatmap, alpha=0.4):
         if heatmap.ndim > 2:
             heatmap = np.squeeze(heatmap)
         
-        # Resize heatmap to match image dimensions
-        heatmap = cv2.resize(heatmap, (img.shape[1], img.shape[0]))
+        # Use alternative method without OpenCV for Streamlit Cloud compatibility
+        from skimage import transform
+        from skimage import color
         
-        # Convert heatmap to RGB
-        heatmap = np.uint8(255 * heatmap)
-        heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
+        # Resize heatmap to match image dimensions
+        heatmap_resized = transform.resize(heatmap, (img.shape[0], img.shape[1]))
         
         # Convert image to RGB if needed
         if len(img.shape) == 2:  # grayscale
-            img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+            img_rgb = color.gray2rgb(img)
         elif len(img.shape) == 3 and img.shape[2] == 1:  # single channel
-            img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+            img_rgb = color.gray2rgb(img.squeeze())
+        else:
+            img_rgb = img.copy()
         
-        # Ensure image is uint8
-        if img.dtype != np.uint8:
-            if img.max() <= 1.0:
-                img = (img * 255).astype(np.uint8)
-            else:
-                img = img.astype(np.uint8)
+        # Normalize image to [0, 1]
+        if img_rgb.max() > 1.0:
+            img_rgb = img_rgb / 255.0
         
-        # Create overlay
-        overlayed_img = cv2.addWeighted(img, 1 - alpha, heatmap, alpha, 0)
+        # Create heatmap overlay using matplotlib colormap
+        cmap = plt.cm.jet
+        heatmap_colored = cmap(heatmap_resized)[:, :, :3]  # Remove alpha channel
+        
+        # Blend images
+        overlayed_img = (1 - alpha) * img_rgb + alpha * heatmap_colored
+        overlayed_img = (overlayed_img * 255).astype(np.uint8)
         
         return overlayed_img
     except Exception as e:
