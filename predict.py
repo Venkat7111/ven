@@ -77,26 +77,43 @@ class PneumoniaPredictor:
                     image_input = (image_input * 255).astype(np.uint8)
                 img = Image.fromarray(image_input).convert("RGB")
                 original_img = np.array(img)
+            elif hasattr(image_input, 'read'):  # Streamlit file upload object
+                # Streamlit file upload object
+                img = Image.open(image_input).convert("RGB")
+                original_img = np.array(img)
             else:
-                raise ValueError("Unsupported image input type")
+                raise ValueError(f"Unsupported image input type: {type(image_input)}")
+            
+            # Validate image
+            if original_img.size == 0:
+                raise ValueError("Image is empty")
+            
+            print(f"Original image shape: {original_img.shape}")
             
             # Convert to grayscale
             img_gray = color.rgb2gray(original_img)
+            print(f"Grayscale image shape: {img_gray.shape}")
             
             # Resize to target size
             img_resized = transform.resize(img_gray, target_size, anti_aliasing=True)
+            print(f"Resized image shape: {img_resized.shape}")
             
             # Normalize to [0, 1] range
             img_normalized = img_resized.astype(np.float32)
+            print(f"Normalized image range: {img_normalized.min():.3f} - {img_normalized.max():.3f}")
             
             # Add channel and batch dimensions
             img_processed = np.expand_dims(img_normalized, axis=-1)  # channel
             img_processed = np.expand_dims(img_processed, axis=0)    # batch
             
+            print(f"Final processed image shape: {img_processed.shape}")
+            
             return img_processed, original_img
             
         except Exception as e:
             print(f"Error preprocessing image: {e}")
+            import traceback
+            traceback.print_exc()
             return None, None
     
     def predict(self, image_input, return_gradcam=False):
